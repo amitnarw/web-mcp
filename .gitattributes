@@ -1,0 +1,3 @@
+# Keep LF so the bin shebang works with every package manager.
+bin/* text eol=lf
+*.mjs text eol=lf

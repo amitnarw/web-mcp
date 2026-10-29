@@ -1,7 +1,7 @@
 {
   "name": "@amitnarw/web-mcp",
-  "version": "0.1.6",
-  "description": "Dedicated browser automation MCP server using an isolated Chromium profile and Extension to provide AI browser control. Fully supports OpenCode, Cursor, Claude Code, Zed Editor, Sourcegraph Cody, Windsurf, Cline, and OpenAI Codex.",
+  "version": "0.2.0",
+  "description": "Browser automation MCP server for AI clients: a dedicated Chromium with a visual overlay, where several AI chats (Claude Code, Cursor, OpenCode, Codex, ...) can work side by side, each in its own tabs.",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -12,8 +12,17 @@
     "ai",
     "agent",
     "automation",
-    "model-context-protocol"
+    "model-context-protocol",
+    "multi-agent"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amitnarw/web-mcp.git"
+  },
+  "homepage": "https://github.com/amitnarw/web-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/amitnarw/web-mcp/issues"
+  },
   "type": "module",
   "main": "dist/mcp/wrapper.min.js",
   "bin": {
@@ -23,40 +32,38 @@
     "dist/",
     "extension/",
     "bin/",
-    "README.md"
+    "README.md",
+    "npm-shrinkwrap.json"
   ],
   "scripts": {
     "build": "tsc",
     "bundle": "node scripts/bundle.mjs",
-    "prepublishOnly": "npm run build && npm run bundle",
-    "postinstall": "node bin/postinstall.js",
+    "prepublishOnly": "npm test && npm run bundle",
     "setup": "node bin/web-mcp.js setup",
     "stop": "node bin/web-mcp.js stop",
-    "status": "node bin/web-mcp.js status"
+    "status": "node bin/web-mcp.js status",
+    "test": "tsc && node --test test/server.test.mjs test/setup.test.mjs"
   },
   "dependencies": {
-    "@fontsource/geist-sans": "^5.2.5",
-    "@fontsource/inter": "^5.2.8",
-    "@inquirer/prompts": "^8.5.2",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sse": "^0.16.1",
-    "chrome-devtools-mcp": "^1.0.0",
-    "chrome-remote-interface": "^0.34.0",
-    "express": "^4.21.0",
-    "material-symbols": "^0.44.12",
-    "puppeteer": "^25.1.0",
-    "ws": "^8.18.0",
-    "zod": "^3.23.0"
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@puppeteer/browsers": "3.0.4",
+    "chrome-devtools-mcp": "1.12.0",
+    "express": "4.22.2",
+    "puppeteer": "25.1.0",
+    "puppeteer-core": "25.1.0",
+    "zod": "3.25.76"
   },
   "devDependencies": {
+    "@fontsource/geist-sans": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "@types/ws": "^8.5.0",
     "esbuild": "^0.28.0",
+    "material-symbols": "^0.44.12",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.12.0"
   }
 }

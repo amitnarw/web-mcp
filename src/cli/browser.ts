@@ -1,39 +1,13 @@
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import { spawn, exec } from "child_process";
-import { promisify } from "util";
+import { loadConfig } from "../shared/paths.js";
+import { ensureServer, ensureChrome, installChromeForTesting } from "../shared/launcher.js";
+import { CommandLines, withOk } from "./common.js";
 
-const execAsync = promisify(exec);
-
-const CONFIG_DIR = path.join(os.homedir(), ".web-mcp");
-
-async function findChromePath(): Promise<string> {
-  try {
-    const puppeteer = (await import("puppeteer")).default;
-    // Attempt to get the executable path
-    let pptrPath = await puppeteer.executablePath();
-    if (fs.existsSync(pptrPath)) {
-      return pptrPath;
-    }
-  } catch (e) {
-    // Ignore error
-  }
-
-  // Fallback to system Chromium if puppeteer fails
-  const paths = [
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser"
-  ];
-
-  for (const p of paths) {
-    if (fs.existsSync(p)) return p;
-  }
-
-  throw new Error("Chromium not found. Please install puppeteer properly or install chromium manually.");
-}
-
-export async function launchBrowser(onProgress?: (lines: string[]) => void): Promise<string[]> {
+/**
+ * `web-mcp browser`: starts the coordination server (without it the
+ * extension's zombie-prevention closes every window after ~60 s) and then the
+ * same dedicated Chromium the MCP wrapper uses, with the same flags and ports.
+ */
+export async function launchBrowser(onProgress?: (lines: string[]) => void): Promise<CommandLines> {
   const lines: string[] = [];
   const notify = () => { if (onProgress) onProgress([...lines]); };
 
@@ -41,111 +15,72 @@ export async function launchBrowser(onProgress?: (lines: string[]) => void): Pro
   lines.push("\x1b[90m(Using a managed Chromium instance because modern Google Chrome blocks automated extension loading)\x1b[0m");
   notify();
 
-  let chromeExe;
+  const { config, warnings } = loadConfig();
+  for (const w of warnings) lines.push(`\x1b[33m! ${w}\x1b[0m`);
+
+  const log = (msg: string) => {
+    lines.push(`\x1b[90m${msg}\x1b[0m`);
+    notify();
+  };
+
+  let server: { ok: boolean; error?: string };
   try {
-    chromeExe = await findChromePath();
+    server = await ensureServer(config, log);
   } catch (err) {
-    lines.push("\x1b[31mERROR: " + (err as Error).message + "\x1b[0m");
+    server = { ok: false, error: (err as Error).message };
+  }
+  if (!server.ok) {
+    lines.push("\x1b[31mERROR: " + (server.error || "Coordination server failed to start") + "\x1b[0m");
     notify();
-    return lines;
+    return withOk(lines, false);
   }
-
-  const profileDir = path.join(CONFIG_DIR, "chromium-profile-v2");
-  const extensionDir = path.join(CONFIG_DIR, "extension");
-
-  try {
-    const { fileURLToPath } = await import("url");
-    const __filename = fileURLToPath(import.meta.url);
-    const sourceExtDir = path.join(path.dirname(__filename), "..", "..", "extension");
-    
-    if (fs.existsSync(sourceExtDir)) {
-      if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
-      fs.cpSync(sourceExtDir, extensionDir, { recursive: true, force: true });
-      fs.writeFileSync(path.join(extensionDir, "env.js"), `globalThis.WEB_MCP_PORT = 3026;\n`);
-    } else if (!fs.existsSync(extensionDir)) {
-      throw new Error("Source extension directory not found.");
-    }
-
-    // Clear Chromium extension caches
-    const defaultExt = path.join(profileDir, "Default", "Extensions");
-    if (fs.existsSync(defaultExt)) fs.rmSync(defaultExt, { recursive: true, force: true });
-    const crxCache = path.join(profileDir, "extensions_crx_cache");
-    if (fs.existsSync(crxCache)) fs.rmSync(crxCache, { recursive: true, force: true });
-
-    // Seed Developer Mode to allow unpacked extensions
-    try {
-      fs.mkdirSync(path.join(profileDir, "Default"), { recursive: true });
-      const localStatePath = path.join(profileDir, "Local State");
-      let localState: any = {};
-      if (fs.existsSync(localStatePath)) {
-        try { localState = JSON.parse(fs.readFileSync(localStatePath, "utf8")); } catch { /* ignore */ }
-      }
-      if (!localState.extensions) localState.extensions = {};
-      if (!localState.extensions.ui) localState.extensions.ui = {};
-      localState.extensions.ui.developer_mode = true;
-      const tmpPath = localStatePath + ".tmp." + Date.now();
-      fs.writeFileSync(tmpPath, JSON.stringify(localState, null, 2));
-      fs.renameSync(tmpPath, localStatePath);
-    } catch (e) {
-      // ignore
-    }
-
-  } catch (e) {
-    lines.push("\x1b[31mERROR: Failed to copy extension: " + (e as Error).message + "\x1b[0m");
-    notify();
-    if (!fs.existsSync(extensionDir)) return lines;
-  }
-
-  const args = [
-    "--remote-debugging-port=9222",
-    `--user-data-dir=${profileDir}`,
-    `--load-extension=${extensionDir}`,
-    "--disable-blink-features=AutomationControlled",
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-popup-blocking",
-    "--disable-translate",
-    "--disable-fre",
-    "--disable-features=DisableLoadExtensionCommandLineSwitch,ExtensionDisableUnsupportedDeveloper",
-    "https://example.com"
-  ];
-
-  const cleanEnv: Record<string, string> = {};
-  for (const key of Object.keys(process.env)) {
-    if (!key.toUpperCase().startsWith("ELECTRON_") && 
-        !key.toUpperCase().startsWith("OPENCODE_") && 
-        !key.toUpperCase().startsWith("VSCODE_")) {
-      cleanEnv[key] = process.env[key] as string;
-    }
-  }
-
-  // Kill existing isolated profile process before relaunch (non-blocking)
-  try {
-    if (process.platform === 'win32') {
-      const profileEscaped = profileDir.replace(/\\/g, '\\\\').replace(/'/g, "''");
-      exec(
-        `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ` +
-        `Where-Object { $_.CommandLine -like '*${profileEscaped}*' } | ` +
-        `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
-        { shell: "powershell.exe" }
-      );
-    } else {
-      spawn('pkill', ['-f', `user-data-dir=${profileDir}`], { detached: true, stdio: 'ignore' }).unref();
-    }
-    // Give it a moment to terminate before we relaunch
-    await new Promise(r => setTimeout(r, 500));
-  } catch (e) {
-    // Ignore error
-  }
-
-  const proc = spawn(chromeExe, args, {
-    detached: true,
-    stdio: "inherit",
-    env: cleanEnv
-  });
-
-  proc.unref();
-  lines.push("\x1b[32mChromium launched successfully! You can now close this terminal.\x1b[0m");
+  lines.push(`\x1b[32m✓ Coordination server ready on 127.0.0.1:${config.server.port}\x1b[0m`);
   notify();
-  return lines;
+
+  let chrome: { ok: boolean; error?: string; launched: boolean };
+  try {
+    chrome = await ensureChrome(config, log, { startUrl: "https://example.com" });
+  } catch (err) {
+    chrome = { ok: false, error: (err as Error).message, launched: false };
+  }
+  if (!chrome.ok) {
+    lines.push("\x1b[31mERROR: " + (chrome.error || "Chromium failed to start") + "\x1b[0m");
+  } else if (chrome.launched) {
+    lines.push("\x1b[32mChromium launched successfully! You can now close this terminal.\x1b[0m");
+  } else {
+    lines.push(`\x1b[32mThe Web MCP Chromium is already running (CDP port ${config.chrome.port}).\x1b[0m`);
+  }
+  notify();
+  return withOk(lines, chrome.ok);
+}
+
+/** `web-mcp install-browser`: downloads the Chrome for Testing build web-mcp is pinned to. */
+export async function installBrowser(onProgress?: (lines: string[]) => void): Promise<CommandLines> {
+  const lines: string[] = ["Installing the Chromium build used by Web MCP (Chrome for Testing)..."];
+  const notify = () => { if (onProgress) onProgress([...lines]); };
+  notify();
+
+  const log = (msg: string) => {
+    lines.push(`\x1b[90m${msg}\x1b[0m`);
+    notify();
+  };
+
+  let result: { ok: boolean; executablePath?: string; error?: string };
+  try {
+    result = await installChromeForTesting(log);
+  } catch (err) {
+    result = { ok: false, error: (err as Error).message };
+  }
+  if (!result.ok) {
+    lines.push("\x1b[31mERROR: " + (result.error || "Download failed") + "\x1b[0m");
+    notify();
+    return withOk(lines, false);
+  }
+  lines.push(`\x1b[32m✓ Chromium installed: ${result.executablePath}\x1b[0m`);
+  const { config } = loadConfig();
+  if (config.chrome.executable !== "auto-detect") {
+    lines.push(`\x1b[33m! config.json sets chrome.executable to ${config.chrome.executable}; set it to "auto-detect" to use this build.\x1b[0m`);
+  }
+  notify();
+  return withOk(lines, true);
 }

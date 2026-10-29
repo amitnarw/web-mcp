@@ -1,16 +1,20 @@
 import fs from "fs";
 import path from "path";
-import os from "os";
+import { PATHS } from "../shared/paths.js";
 
-const CONFIG_DIR = path.join(os.homedir(), ".web-mcp");
-const LOGS_DIR = path.join(CONFIG_DIR, "logs");
-const LOG_FILE = path.join(LOGS_DIR, "server.log");
+// PATHS honours WEB_MCP_HOME, so tests and side-by-side instances log to
+// their own directory.
+const LOG_FILE = path.join(PATHS.logsDir, "server.log");
 const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_ROTATED_FILES = 7;
 
-// Ensure logs directory exists
-if (!fs.existsSync(LOGS_DIR)) {
-  fs.mkdirSync(LOGS_DIR, { recursive: true });
+// Created lazily on first write instead of at import time.
+let logsDirReady = false;
+
+function ensureLogsDir(): void {
+  if (logsDirReady) return;
+  fs.mkdirSync(PATHS.logsDir, { recursive: true });
+  logsDirReady = true;
 }
 
 function rotateIfNeeded(): void {
@@ -37,11 +41,14 @@ function rotateIfNeeded(): void {
   }
 }
 
+/** Appends one line to logs/server.log. Callers must pass already-redacted text. */
 export function logToFile(message: string): void {
   try {
+    ensureLogsDir();
     rotateIfNeeded();
     const line = `[${new Date().toISOString()}] ${message}\n`;
-    fs.appendFileSync(LOG_FILE, line);
+    // Logs contain URLs and task names: keep them private to the user.
+    fs.appendFileSync(LOG_FILE, line, { mode: 0o600 });
   } catch {
     // Ignore write errors
   }

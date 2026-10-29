@@ -35,22 +35,14 @@ async function bundleServer() {
       minify: true,
       treeShaking: true,
       platform: "node",
-      target: "node18",
+      target: "node22",
       format: "esm",
       outfile: outFile,
       sourcemap: false,
       legalComments: "none",
-      // Don't bundle node_modules — keep them external
-      external: [
-        "@modelcontextprotocol/sdk",
-        "chrome-devtools-mcp",
-        "express",
-        "ws",
-        "zod",
-        "cors",
-        "eventsource-parser",
-        "puppeteer",
-      ],
+      // Never bundle dependencies: they are installed next to the package and
+      // version-locked by npm-shrinkwrap.json.
+      packages: "external",
     });
   }
 

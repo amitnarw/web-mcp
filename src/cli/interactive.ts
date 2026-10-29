@@ -1,6 +1,7 @@
 import { Orb } from "./orb.js";
+import { HELP_LINES } from "./common.js";
 
-type ViewState = "MAIN" | "SETUP_MENU" | "UNINSTALL_MENU" | "INFO_VIEW";
+type ViewState = "MAIN" | "SETUP_MENU" | "UNINSTALL_MENU" | "CONFIRM_UNINSTALL_ALL" | "INFO_VIEW";
 
 const MAIN_OPTIONS = [
   { value: "setup", label: "Configure AI Client (Setup)" },
@@ -16,28 +17,33 @@ const MAIN_OPTIONS = [
 ];
 
 export async function run(startState: ViewState = "MAIN", initialInfoLines: string[] = []) {
+  // Check before emitting any alt-screen / cursor / mouse escape codes, so a
+  // piped or scripted invocation gets a clean message instead of garbage.
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error("Interactive mode requires a TTY. Please run this command in a terminal.");
+    console.error("For scripts and agents use e.g. `web-mcp setup cursor` (run `web-mcp help` for all commands).");
+    process.exit(1);
+  }
+
   const orb = new Orb();
-  
+  const { UNINSTALL_OPTIONS: UNINSTALL_MENU_OPTIONS } = await import("./setup.js");
+  // The destructive "all" entry is never pre-selected: the uninstall menu opens on Cancel.
+  const uninstallDefaultIndex = Math.max(0, UNINSTALL_MENU_OPTIONS.findIndex(o => o.value === "cancel"));
+
   let currentState: ViewState = startState;
   let mainIndex = 0;
   let setupIndex = 0;
-  let uninstallIndex = 0;
-  
+  let uninstallIndex = uninstallDefaultIndex;
+
   let infoLines: string[] = initialInfoLines;
   let isProcessing = false;
   let configuredClients: string[] = [];
-  
+
   let time = 0;
   let debugMsg = "Waiting for input...";
-  
+
   process.stdout.write("\x1b[?1049h\x1b[?25l\x1b[?1002h\x1b[?1015h\x1b[?1006h");
-  
-  if (process.stdin.isTTY) {
-    process.stdin.setRawMode(true);
-  } else {
-    console.log("Interactive mode requires a TTY. Please run this command in a terminal.");
-    process.exit(1);
-  }
+  process.stdin.setRawMode(true);
   process.stdin.resume();
   process.stdin.setEncoding("utf8");
 
@@ -165,7 +171,7 @@ export async function run(startState: ViewState = "MAIN", initialInfoLines: stri
             } else if (sel === "uninstall") {
               isProcessing = true;
               currentState = "UNINSTALL_MENU";
-              uninstallIndex = 0;
+              uninstallIndex = uninstallDefaultIndex;
               isProcessing = false;
             } else if (sel === "test") {
               isProcessing = true;
@@ -186,7 +192,7 @@ export async function run(startState: ViewState = "MAIN", initialInfoLines: stri
               infoLines = ["\x1b[36mTroubleshooting...\x1b[0m"];
               currentState = "INFO_VIEW";
               const { runTroubleshooter } = await import("./troubleshoot.js");
-              infoLines = await runTroubleshooter((lines) => { infoLines = lines; });
+              infoLines = await runTroubleshooter({}, (lines) => { infoLines = lines; });
               isProcessing = false;
             } else if (sel === "status") {
               isProcessing = true;
@@ -203,21 +209,7 @@ export async function run(startState: ViewState = "MAIN", initialInfoLines: stri
               infoLines = await stopProcesses();
               isProcessing = false;
             } else if (sel === "help") {
-              infoLines = [
-                "\x1b[1mWeb MCP - In-Browser Copilot\x1b[0m",
-                "",
-                "Usage (from terminal):",
-                "  web-mcp          Open the interactive dashboard",
-                "  web-mcp mcp      Run MCP server (used automatically by AI clients)",
-                "  web-mcp setup    Configure AI Client (Setup) or Uninstall",
-                "  web-mcp browser  Launch the isolated Chromium browser manually",
-                "  web-mcp troubleshoot  Troubleshoot and fix environment issues",
-                "  web-mcp test     Test Setup & Configurations",
-                "  web-mcp status   Check Server & Chromium Status",
-                "  web-mcp stop     Stop Server & Chromium",
-                "  web-mcp help     Show this help menu",
-                "  web-mcp about    About Web MCP"
-              ];
+              infoLines = [...HELP_LINES];
               currentState = "INFO_VIEW";
             } else if (sel === "about") {
               infoLines = [
@@ -267,6 +259,8 @@ export async function run(startState: ViewState = "MAIN", initialInfoLines: stri
             const sel = UNINSTALL_OPTIONS[uninstallIndex].value;
             if (sel === "cancel") {
               currentState = "MAIN";
+            } else if (sel === "all") {
+              currentState = "CONFIRM_UNINSTALL_ALL";
             } else {
               isProcessing = true;
               infoLines = ["\x1b[36mUninstalling...\x1b[0m"];
@@ -275,6 +269,20 @@ export async function run(startState: ViewState = "MAIN", initialInfoLines: stri
               infoLines = await uninstallClient(sel);
               isProcessing = false;
             }
+          }
+        }
+        else if (currentState === "CONFIRM_UNINSTALL_ALL") {
+          // Only an explicit "y" proceeds; any other key (or a click) cancels.
+          if (key === "y" || key === "Y") {
+            isProcessing = true;
+            infoLines = ["\x1b[36mUninstalling from all clients...\x1b[0m"];
+            currentState = "INFO_VIEW";
+            const { uninstallClient } = await import("./setup.js");
+            infoLines = await uninstallClient("all", { confirmed: true });
+            isProcessing = false;
+          } else if (!isMouse || isDown) {
+            currentState = "UNINSTALL_MENU";
+            uninstallIndex = uninstallDefaultIndex;
           }
         }
         else if (currentState === "INFO_VIEW") {
@@ -360,6 +368,15 @@ export async function run(startState: ViewState = "MAIN", initialInfoLines: stri
             out += `  ${opt.label}\x1b[K\n`;
           }
         }
+      }
+      else if (currentState === "CONFIRM_UNINSTALL_ALL") {
+        out += `\x1b[1m\x1b[31mUninstall from ALL clients?\x1b[0m\x1b[K\n`;
+        out += `\x1b[K\n`;
+        out += `This removes web-mcp from every configured AI client, stops Web MCP,\x1b[K\n`;
+        out += `and deletes its local data — including the Web MCP browser profile,\x1b[K\n`;
+        out += `so \x1b[1msaved logins in the Web MCP browser will be removed\x1b[0m.\x1b[K\n`;
+        out += `\x1b[K\n`;
+        out += `Proceed? \x1b[1m(y/N)\x1b[0m\x1b[K\n`;
       }
       else if (currentState === "INFO_VIEW") {
         for (const line of infoLines) {

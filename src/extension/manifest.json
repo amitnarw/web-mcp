@@ -1,19 +1,16 @@
 {
   "manifest_version": 3,
   "name": "web-mcp extension",
-  "version": "1.0.0",
-  "description": "An dedicated in-browser automation copilot that gives AI assistants direct control over Chromium with real-time visual feedback.",
+  "version": "0.2.0",
+  "description": "A dedicated in-browser automation copilot: AI agents drive Chromium, each in its own tabs, with real-time visual feedback.",
   "icons": {
     "128": "icon128.png"
   },
   "permissions": [
-    "sidePanel",
-    "tabs",
-    "activeTab",
-    "scripting"
+    "sidePanel"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "service_worker.js"
@@ -21,14 +18,13 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["env.js", "content.js"],
-      "run_at": "document_end"
-    }
-  ],
-  "web_accessible_resources": [
+      "js": ["claim.js"],
+      "run_at": "document_start"
+    },
     {
-      "resources": ["sidepanel.html"],
-      "matches": ["<all_urls>"]
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
     }
   ],
   "side_panel": {

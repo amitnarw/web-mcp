@@ -18,9 +18,6 @@
     @keyframes orb-blink { 0%, 96%, 98% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
     .bp-dialog-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 2147483651; display: flex; align-items: center; justify-content: center; pointer-events: auto; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: bp-fade-in-fast 0.2s ease-out; font-family: 'Inter', sans-serif; }
     @keyframes bp-fade-in-fast { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes bp-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-    @keyframes dune-wind { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-    .active-neon-card { background: linear-gradient(-45deg, #007aff, #005bc1, #00a2ff, #005bc1); background-size: 400% 400%; animation: dune-wind 15s ease infinite; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 24px rgba(0, 122, 255, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4); color: white; }
     .bp-dialog { background: #131315; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); padding: 24px; width: 90%; max-width: 300px; display: flex; flex-direction: column; gap: 12px; transform: scale(0.95); animation: bp-pop-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
     @keyframes bp-pop-in { to { transform: scale(1); } }
     .bp-dialog-title { font-size: 16px; font-weight: 600; color: #adc6ff; margin: 0; display: flex; align-items: center; gap: 8px; }
@@ -31,77 +28,120 @@
     .bp-dialog-btn-cancel:hover { background: rgba(255,255,255,0.15); color: #e4e2e4; }
     .bp-dialog-btn-stop { background: rgba(147,0,10,0.3); color: #ffb4ab; }
     .bp-dialog-btn-stop:hover { background: rgba(147,0,10,0.4); }
+
+    /* ─── Multi-agent panel (bp- classes; not part of the compiled Tailwind set) ─── */
+    .bp-hidden { display: none !important; }
+    .bp-brand { font-weight: 700; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; background-image: linear-gradient(to right, #4b8eff, #adc6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .bp-header-right { display: flex; align-items: center; gap: 10px; }
+    .bp-conn { display: flex; align-items: center; gap: 6px; font-family: Geist, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.45); }
+    .bp-conn-dot { width: 6px; height: 6px; border-radius: 50%; background: #ffb4ab; box-shadow: 0 0 8px rgba(255,100,100,0.5); }
+    .bp-conn.bp-on .bp-conn-dot { background: #34c759; box-shadow: 0 0 8px rgba(52,199,89,0.6); }
+    .bp-halt-all-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px 5px 8px; border-radius: 9999px; border: 1px solid rgba(255,180,171,0.25); background: rgba(147,0,10,0.25); color: #ffb4ab; font-family: Geist, sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+    .bp-halt-all-btn:hover:not(:disabled) { background: rgba(147,0,10,0.45); }
+    .bp-halt-all-btn:disabled { opacity: 0.35; cursor: default; }
+    .bp-halt-all-btn .material-symbols-outlined { font-size: 15px; }
+    .bp-version { font-family: Geist, sans-serif; font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.08em; margin-left: 6px; }
+
+    .bp-banner { margin-top: 12px; padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 1.4; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: #c1c6d7; }
+    .bp-banner.bp-banner-error { border-color: rgba(255,180,171,0.3); background: rgba(147,0,10,0.2); color: #ffb4ab; }
+
+    .bp-agent-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .bp-agent-card { --bp-agent-color: #4b8eff; --bp-agent-rgb: 75, 142, 255; --bp-agent-light-rgb: 173, 198, 255; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 14px 17px; border-radius: 14px; background: rgba(44,44,46,0.4); backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px); border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+    .bp-agent-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--bp-agent-color); opacity: 0.8; }
+    .bp-agent-card.bp-is-active { border-color: rgba(var(--bp-agent-rgb), 0.45); box-shadow: 0 0 22px rgba(var(--bp-agent-rgb), 0.18), inset 0 1px 0 rgba(255,255,255,0.12); }
+    .bp-agent-card.bp-is-halted::before { background: #ffb4ab; }
+    .bp-agent-head { display: flex; align-items: center; gap: 10px; }
+    .bp-agent-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--bp-agent-color); box-shadow: 0 0 8px rgba(var(--bp-agent-rgb), 0.6); }
+    @keyframes bp-dot-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.7; } }
+    .bp-is-active .bp-agent-dot { animation: bp-dot-pulse 1.6s ease-in-out infinite; }
+    .bp-agent-titles { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 2px; }
+    .bp-agent-label { font-size: 14px; font-weight: 600; color: #e4e2e4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+    .bp-agent-client { font-family: Geist, sans-serif; font-size: 10px; color: #8b90a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.02em; }
+    .bp-pill { flex-shrink: 0; font-family: Geist, sans-serif; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 9999px; border: 1px solid transparent; }
+    .bp-pill-active { color: rgb(var(--bp-agent-light-rgb)); background: rgba(var(--bp-agent-rgb), 0.15); border-color: rgba(var(--bp-agent-rgb), 0.35); }
+    .bp-pill-idle { color: #c1c6d7; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+    .bp-pill-halted { color: #ffb4ab; background: rgba(147,0,10,0.25); border-color: rgba(255,180,171,0.3); }
+    .bp-agent-task { display: flex; flex-direction: column; gap: 2px; }
+    .bp-agent-task-text { font-size: 13px; color: #e4e2e4; line-height: 1.35; word-break: break-word; }
+    .bp-section-label { font-family: Geist, sans-serif; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #8b90a0; }
+    .bp-agent-section { display: flex; flex-direction: column; gap: 6px; }
+    .bp-tab-list { display: flex; flex-direction: column; gap: 4px; }
+    .bp-tab-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #c1c6d7; font-size: 12px; font-family: inherit; cursor: pointer; transition: background 0.2s ease; }
+    .bp-tab-row:hover { background: rgba(255,255,255,0.07); }
+    .bp-tab-row:disabled { cursor: default; opacity: 0.6; }
+    .bp-tab-row.bp-is-current { border-color: rgba(var(--bp-agent-rgb), 0.4); color: #e4e2e4; }
+    .bp-tab-row .material-symbols-outlined { font-size: 14px; color: #8b90a0; flex-shrink: 0; }
+    .bp-tab-row.bp-is-current .material-symbols-outlined { color: rgb(var(--bp-agent-light-rgb)); }
+    .bp-tab-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bp-tab-tag { flex-shrink: 0; font-family: Geist, sans-serif; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: rgb(var(--bp-agent-light-rgb)); }
+    .bp-tab-tag.bp-muted { color: #8b90a0; }
+    .bp-empty-line { font-size: 12px; color: #8b90a0; font-style: italic; }
+    .bp-action-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .bp-action-row { display: flex; gap: 8px; align-items: baseline; font-size: 12px; line-height: 1.4; color: #c1c6d7; }
+    .bp-action-row.bp-is-latest { color: #e4e2e4; }
+    .bp-action-row.bp-is-latest .bp-action-bullet { background: rgb(var(--bp-agent-light-rgb)); box-shadow: 0 0 6px rgba(var(--bp-agent-rgb), 0.7); }
+    .bp-action-bullet { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+    .bp-action-text { flex: 1; min-width: 0; word-break: break-word; }
+    .bp-action-time { flex-shrink: 0; font-family: Geist, sans-serif; font-size: 10px; color: #8b90a0; }
+    .bp-agent-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .bp-agent-error { flex: 1; font-size: 11px; color: #ffb4ab; word-break: break-word; }
+    .bp-agent-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px 6px 9px; border-radius: 9999px; font-family: Geist, sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s ease; }
+    .bp-agent-btn .material-symbols-outlined { font-size: 15px; }
+    .bp-agent-btn:disabled { opacity: 0.5; cursor: default; }
+    .bp-agent-btn-halt { background: rgba(147,0,10,0.25); color: #ffb4ab; border-color: rgba(255,180,171,0.25); }
+    .bp-agent-btn-halt:hover:not(:disabled) { background: rgba(147,0,10,0.45); }
+    .bp-agent-btn-resume { background: rgba(var(--bp-agent-rgb), 0.2); color: rgb(var(--bp-agent-light-rgb)); border-color: rgba(var(--bp-agent-rgb), 0.4); }
+    .bp-agent-btn-resume:hover:not(:disabled) { background: rgba(var(--bp-agent-rgb), 0.35); }
+
+    .bp-log-line { margin-bottom: 2px; word-break: break-word; }
+    .bp-log-time { color: #8b90a0; }
+    .bp-log-meta { color: #adc6ff; margin-bottom: 8px; }
+    .bp-log-error { color: #ffb4ab; }
   </style>
 </head>
 <body class="mesh-bg text-on-surface h-full w-full overflow-hidden flex flex-col font-body-lg m-0 p-0">
   <header class="flex justify-between items-center px-inner-padding h-16 w-full sticky top-0 z-50 bg-surface/60 dark:bg-surface/60 backdrop-blur-[32px] border-b border-white/10 shadow-none transition-colors shrink-0">
-    <button class="text-on-surface-variant dark:text-on-surface-variant hover:bg-white/5 transition-colors p-2 rounded-full flex items-center justify-center">
-      <div id="spinner" class="hidden w-8 h-8 rounded-full bg-surface-container flex items-center justify-center relative">
-        <div class="bp-premium-wrapper">
-          <div class="bp-premium-orb">
-            <div class="bp-orb-eyes">
-              <div class="bp-orb-eye"></div>
-              <div class="bp-orb-eye"></div>
+    <div class="flex items-center gap-2">
+      <div class="text-on-surface-variant dark:text-on-surface-variant p-2 rounded-full flex items-center justify-center">
+        <div id="spinner" class="hidden w-8 h-8 rounded-full bg-surface-container flex items-center justify-center relative">
+          <div class="bp-premium-wrapper">
+            <div class="bp-premium-orb">
+              <div class="bp-orb-eyes">
+                <div class="bp-orb-eye"></div>
+                <div class="bp-orb-eye"></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </button>
-    <div class="font-bold tracking-[0.2em] uppercase bg-gradient-to-r from-[#4b8eff] to-[#adc6ff] bg-clip-text text-transparent text-[13px] ml-2">Web MCP</div>
+      <div class="bp-brand">Web MCP</div>
+      <span id="version" class="bp-version"></span>
+    </div>
+    <div class="bp-header-right">
+      <div id="conn" class="bp-conn" title="Connection to the Web MCP server">
+        <span class="bp-conn-dot"></span>
+        <span id="conn-text">Offline</span>
+      </div>
+      <button id="halt-all-btn" class="bp-halt-all-btn" type="button" disabled title="Halt every agent">
+        <span class="material-symbols-outlined" data-icon="pause">pause</span> Halt all
+      </button>
+    </div>
   </header>
 
   <main class="flex-1 overflow-y-auto custom-scrollbar pb-24 p-container-padding flex flex-col gap-section-gap">
-    
-    <!-- Active State -->
-    <div id="active-state" class="hidden flex-col gap-section-gap flex-1">
-      <section class="flex flex-col gap-stack-gap mt-4">
-        <h2 class="font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">Active Goal</h2>
-        <div class="active-neon-card rounded-full p-4 flex flex-col gap-4 relative overflow-hidden">
-          <div class="absolute -top-10 -right-10 w-24 h-24 bg-white rounded-full blur-[40px] opacity-20"></div>
-          
-          <div id="lock-banner" class="hidden items-center gap-2 rounded-lg p-2 z-10" style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1);">
-            <span class="material-symbols-outlined text-[16px]" style="color: #adc6ff;" data-icon="lock">lock</span>
-            <span class="font-label-md text-[10px] uppercase" style="color: #adc6ff; font-weight: bold;">AI is controlling the browser</span>
-          </div>
 
-          <div class="flex items-start gap-3 z-10">
-            <div class="flex flex-col gap-1">
-              <span class="font-label-md uppercase tracking-wider text-[10px]" style="color: #adc6ff; font-weight: bold;">Current Task</span>
-              <span id="current-task" class="font-body-md leading-tight text-[14px]" style="color: white; font-weight: 500;">Waiting for instructions...</span>
-            </div>
-          </div>
-          
-          <div class="flex flex-col gap-1 z-10 mt-2">
-            <div class="flex justify-between items-center">
-              <span class="font-mono-code text-[10px] text-white/80 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span> Processing</span>
-            </div>
-            <div class="h-1 w-full bg-black/20 rounded-full overflow-hidden relative">
-              <div class="absolute top-0 bottom-0 left-0 w-1/2 bg-white/40" style="animation: bp-scan 2s ease-in-out infinite;"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      <section class="flex flex-col gap-stack-gap flex-1">
-        <div class="flex items-center justify-between">
-          <h2 class="font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">Action Log</h2>
-          <button id="halt-btn" class="text-primary hover:text-secondary transition-colors font-label-md text-[10px] flex items-center gap-1">
-            <span class="material-symbols-outlined text-[16px]" data-icon="pause">pause</span> Halt
-          </button>
-        </div>
-        <div id="actions" class="flex flex-col relative before:absolute before:inset-y-2 before:left-[11.5px] before:w-px before:bg-white/10 ml-1">
-        </div>
-        <div class="h-16 w-full shrink-0"></div> <!-- Spacer for scrolling -->
-      </section>
-    </div>
+    <div id="banner" class="bp-banner bp-hidden"></div>
 
-    <!-- Idle State -->
-    <div id="idle-state" class="flex flex-col items-center justify-center h-full text-center flex-1 py-10">
+    <!-- One card per agent (built by sidepanel.js) -->
+    <div id="agents-list" class="bp-agent-list bp-hidden"></div>
+
+    <!-- Empty / disconnected state -->
+    <div id="empty-state" class="flex flex-col items-center justify-center h-full text-center flex-1 py-10">
       <div class="w-16 h-16 rounded-full bg-surface-container-highest border border-outline/30 flex items-center justify-center mb-4">
-        <span class="material-symbols-outlined text-outline text-3xl" data-icon="hourglass_empty">hourglass_empty</span>
+        <span id="empty-icon" class="material-symbols-outlined text-outline text-3xl" data-icon="hourglass_empty">hourglass_empty</span>
       </div>
-      <h2 class="font-headline-md text-[16px] text-on-surface mb-1">Ready & Waiting</h2>
-      <p class="font-body-sm text-[12px] text-on-surface-variant max-w-[240px]">Real-time activity will appear here.</p>
+      <h2 id="empty-title" class="font-headline-md text-[16px] text-on-surface mb-1">Connecting&hellip;</h2>
+      <p id="empty-desc" class="font-body-sm text-[12px] text-on-surface-variant max-w-[240px]">Looking for the Web MCP server.</p>
     </div>
 
     <!-- Debug Section -->
@@ -117,9 +157,8 @@
     </div>
   </main>
 
-
-
   <script src="env.js"></script>
+  <script src="server_api.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

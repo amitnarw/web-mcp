@@ -16,7 +16,7 @@
     .bp-orb-eyes { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 3px; z-index: 2; transition: transform 0.1s ease-out; transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); }
     .bp-orb-eye { width: 4px; height: 4px; background: #adc6ff; border-radius: 50%; animation: orb-blink 4s infinite; box-shadow: 0 0 4px rgba(173,198,255,0.5); }
     @keyframes orb-blink { 0%, 96%, 98% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
-    
+
     @keyframes slide-up-fade {
       from { opacity: 0; transform: translateY(15px); }
       to { opacity: 1; transform: translateY(0); }
@@ -41,7 +41,7 @@
     .ghost-pill-btn:active { transform: scale(0.98); }
     .footer-text { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; transition: color 0.2s ease; }
     .debug-box { max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 9px; line-height: 1.5; color: #c1c6d7; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(12px); padding: 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5); }
-    
+
     .bp-dialog-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); animation: bp-fade-in-fast 0.2s ease-out; }
     @keyframes bp-fade-in-fast { from { opacity: 0; } to { opacity: 1; } }
     .bp-dialog { background: #131315; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); padding: 24px; width: 280px; display: flex; flex-direction: column; gap: 12px; transform: scale(0.95); animation: bp-pop-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
@@ -54,16 +54,28 @@
     .bp-dialog-btn-cancel:hover { background: rgba(255,255,255,0.15); color: #e4e2e4; }
     .bp-dialog-btn-stop { background: rgba(147,0,10,0.3); color: #ffb4ab; }
     .bp-dialog-btn-stop:hover { background: rgba(147,0,10,0.4); }
+
+    /* 0.2.0 additions */
+    .bp-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #ffb4ab; box-shadow: 0 0 8px rgba(255,100,100,0.5); }
+    .bp-status-dot.bp-on { background: #34c759; box-shadow: 0 0 8px rgba(52,199,89,0.6); }
+    .bp-summary-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+    .bp-halt-all-btn { color: #ffb4ab; }
+    .bp-halt-all-btn:hover:not(:disabled) { background: rgba(147,0,10,0.25); color: #ffb4ab; }
+    .bp-halt-all-btn:disabled { opacity: 0.35; cursor: default; }
+    .bp-hidden { display: none !important; }
+    .bp-log-line { margin-bottom: 2px; word-break: break-word; }
+    .bp-log-time { color: #8b90a0; }
+    .bp-log-error { color: #ef4444; }
   </style>
 </head>
 <body class="popup-body font-body-lg">
-  
+
   <!-- Ambient Deep Space Glow -->
   <div class="ambient-glow"></div>
 
   <!-- Main Content Wrapper -->
   <div class="popup-content-wrapper">
-    
+
     <!-- Top Header & Status -->
     <div class="flex justify-between items-start w-full animate-slide-up" style="animation-delay: 0s;">
       <!-- Logo + Orb Group -->
@@ -73,49 +85,53 @@
             <div class="bp-orb-eyes"><div class="bp-orb-eye"></div><div class="bp-orb-eye"></div></div>
           </div>
         </div>
-        <div class="font-bold uppercase text-white/50" style="font-size: 10px; letter-spacing: 0.3em;">Web MCP</div>
+        <div class="font-bold uppercase" style="font-size: 10px; letter-spacing: 0.3em; color: rgba(255,255,255,0.5);">Web MCP</div>
       </div>
-      
+
       <!-- Integrated Status Indicator -->
       <div class="flex items-center gap-2 mt-1">
         <span id="status-text" class="status-text">Checking</span>
-        <span id="status-dot" class="w-1.5 h-1.5 rounded-full bg-error shadow-[0_0_8px_rgba(255,100,100,0.5)]"></span>
+        <span id="status-dot" class="bp-status-dot"></span>
       </div>
     </div>
 
-    <!-- Central Focus: Active Directive -->
+    <!-- Central Focus: Agents -->
     <div class="flex flex-col gap-2 animate-slide-up" style="animation-delay: 0.1s;">
-      <span class="directive-label font-label-md">Active Directive</span>
-      <div id="task-display" class="task-text font-body-sm">Awaiting instructions...</div>
+      <span class="directive-label font-label-md">Agents</span>
+      <div>
+        <div id="agent-summary" class="task-text font-body-sm">Checking&hellip;</div>
+        <div id="agent-sub" class="bp-summary-sub"></div>
+      </div>
     </div>
 
-    <!-- Action Pill Button -->
+    <!-- Action Pill Buttons -->
     <div class="flex flex-col gap-3 mt-auto animate-slide-up" style="animation-delay: 0.2s;">
-      <button id="open-sidebar" class="primary-pill-btn font-label-md">
+      <button id="open-sidebar" class="primary-pill-btn font-label-md" type="button">
         <span class="material-symbols-outlined" style="font-size: 18px;" data-icon="dock_to_right">dock_to_right</span>
-        Open Sidebar
+        Open side panel
       </button>
-      
+
       <!-- Ghost Secondary Button -->
-      <button id="take-control" class="ghost-pill-btn font-label-md" style="display: none;">
-        Halt Action
+      <button id="halt-all" class="ghost-pill-btn bp-halt-all-btn font-label-md" type="button" disabled>
+        Halt all agents
       </button>
     </div>
 
     <!-- Sleek Footer -->
     <div class="flex justify-between items-center animate-slide-up" style="animation-delay: 0.3s; margin-top: -4px;">
-      <div id="debug-toggle" class="footer-text font-label-md text-primary/50 hover:text-primary">Debug Logs</div>
-      <div id="version-display" class="footer-text font-label-md text-on-surface-variant/30">V1.0.0</div>
+      <div id="debug-toggle" class="footer-text font-label-md" style="color: rgba(173,198,255,0.5);">Debug Logs</div>
+      <div id="version-display" class="footer-text font-label-md" style="color: rgba(193,198,215,0.3);"></div>
     </div>
-    
+
     <!-- Hidden Debug Panel -->
-    <div id="debug-section" class="hidden flex-col gap-2 mt-2 animate-slide-up" style="animation-delay: 0s;">
+    <div id="debug-section" class="bp-hidden flex-col gap-2 mt-2">
       <div id="debug-panel" class="debug-box custom-scrollbar font-mono-code"></div>
     </div>
-    
+
   </div>
 
   <script src="env.js"></script>
+  <script src="server_api.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

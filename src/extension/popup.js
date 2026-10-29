@@ -1,126 +1,223 @@
 (function() {
   "use strict";
 
-  var port = globalThis.WEB_MCP_PORT || 3026;
-  var SERVER_URL = "http://localhost:" + port;
+  // Extension page: env.js (port + token) and server_api.js are loaded by popup.html.
+  var Api = globalThis.WebMcpApi;
+  var REFRESH_MS = 2000;
+
   var statusDot = document.getElementById("status-dot");
   var statusText = document.getElementById("status-text");
-  var taskDisplay = document.getElementById("task-display");
+  var summary = document.getElementById("agent-summary");
+  var sub = document.getElementById("agent-sub");
   var versionDisplay = document.getElementById("version-display");
   var openSidebarBtn = document.getElementById("open-sidebar");
+  var haltAllBtn = document.getElementById("halt-all");
   var debugToggle = document.getElementById("debug-toggle");
+  var debugSection = document.getElementById("debug-section");
   var debugPanel = document.getElementById("debug-panel");
   var debugVisible = false;
   var debugPollTimer = null;
+  var windowId = null;
 
-  function updateUI(data) {
-    if (data.connected) {
-      statusDot.className = "status-dot connected";
-      statusText.textContent = "Connected";
-    } else {
-      statusDot.className = "status-dot disconnected";
-      statusText.textContent = "Disconnected";
-    }
+  // A one-off notice ("All agents halted") stays until the state changes after it was shown.
+  var notice = "";
+  var noticeBaseline = null;   // state JSON when the notice was first displayed
+  var lastStateJson = null;
 
-    if (data.task) {
-      taskDisplay.textContent = data.task;
-      taskDisplay.className = "task-name";
-    } else {
-      taskDisplay.textContent = data.sidebarActive ? "Sidebar active" : "No active task";
-      taskDisplay.className = data.sidebarActive ? "task-name" : "task-name no-task";
-    }
+  function log(msg) {
+    console.log("[Web MCP] " + msg);
+  }
 
-    if (data.version) {
-      versionDisplay.textContent = "v" + data.version;
-    }
+  try {
+    versionDisplay.textContent = "v" + chrome.runtime.getManifest().version;
+  } catch (e) { /* ignore */ }
 
-    var takeControlBtn = document.getElementById("take-control");
-    if (takeControlBtn) {
-      takeControlBtn.style.display = data.sidebarActive ? "block" : "none";
+  // Resolve the window now so "Open side panel" can call sidePanel.open
+  // synchronously inside the click (the user gesture is lost after an await).
+  try {
+    chrome.windows.getCurrent(function(win) {
+      if (!chrome.runtime.lastError && win && typeof win.id === "number") windowId = win.id;
+    });
+  } catch (e) { /* ignore */ }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  function setNotice(text) {
+    notice = text;
+    noticeBaseline = null;
+  }
+
+  // Clears the notice once the state differs from the one it was shown with.
+  function trackNotice(stateJson) {
+    if (!notice) return;
+    if (noticeBaseline === null) noticeBaseline = stateJson;
+    else if (stateJson !== noticeBaseline) {
+      notice = "";
+      noticeBaseline = null;
     }
   }
 
-  // Get status from server directly (not via service worker)
-  function fetchStatus() {
-    fetch(SERVER_URL + "/status")
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        updateUI({
-          connected: true,
-          sidebarActive: data.sidebarActive || false,
-          task: data.currentTask || null,
-          sessionState: data.sessionState || "idle",
-          version: "1.0.0"
-        });
-      })
-      .catch(function() {
-        updateUI({ connected: false, sidebarActive: false, task: null, version: "1.0.0" });
+  // ─── Status ────────────────────────────────────────────────────────────
+
+  var STATUS_LABELS = { token_mismatch: "Unauthorized", no_token: "No token", not_web_mcp: "Unverified", timeout: "Not responding" };
+
+  function renderDisconnected(reason) {
+    statusDot.classList.remove("bp-on");
+    statusText.textContent = STATUS_LABELS[reason] || "Disconnected";
+    summary.textContent = reason === "token_mismatch" ? "Token mismatch" : (reason === "not_web_mcp" ? "Unexpected server" : "Server not reachable");
+    sub.textContent = notice || Api.describe(reason);
+    haltAllBtn.disabled = true;
+  }
+
+  function renderConnected(agents) {
+    statusDot.classList.add("bp-on");
+    statusText.textContent = "Connected";
+
+    var total = agents.length;
+    var active = 0;
+    var halted = 0;
+    var haltable = 0;
+    agents.forEach(function(a) {
+      if (a.halted) halted++;
+      else haltable++;
+      if (a.status === "active" && !a.halted) active++;
+    });
+
+    summary.textContent = total === 0 ? "No agents connected" : total + (total === 1 ? " agent" : " agents") + " · " + active + " active";
+    sub.textContent = notice || (halted > 0 ? halted + " halted" : "");
+    haltAllBtn.disabled = haltable === 0;
+  }
+
+  function fetchState() {
+    Api.request("GET", "/state").then(function(r) {
+      if (r.ok && r.data && Array.isArray(r.data.agents)) {
+        var agents = r.data.agents.filter(function(a) { return a && typeof a === "object"; });
+        lastStateJson = JSON.stringify(agents);
+        trackNotice(lastStateJson);
+        renderConnected(agents);
+      } else {
+        var reason = r.reason || "http";
+        trackNotice("disconnected:" + reason);
+        renderDisconnected(reason);
+      }
+    });
+  }
+
+  // ─── Buttons ───────────────────────────────────────────────────────────
+
+  function openSidePanel(id) {
+    chrome.sidePanel.open({ windowId: id }).then(function() {
+      window.close();
+    }, function(err) {
+      log("Could not open side panel: " + err.message);
+      setNotice("Could not open the side panel");
+      fetchState();
+    });
+  }
+
+  openSidebarBtn.addEventListener("click", function() {
+    try {
+      if (windowId !== null) {
+        openSidePanel(windowId);
+        return;
+      }
+      chrome.windows.getCurrent(function(win) {
+        if (chrome.runtime.lastError || !win) {
+          log("Could not resolve the current window");
+          return;
+        }
+        openSidePanel(win.id);
       });
-  }
+    } catch (err) {
+      log("Could not open side panel: " + err.message);
+    }
+  });
 
-  // Fetch debug logs from server
+  haltAllBtn.addEventListener("click", function() {
+    if (haltAllBtn.disabled) return;
+    var dOverlay = el("div", "bp-dialog-overlay");
+    dOverlay.addEventListener("click", function(e) {
+      if (e.target === dOverlay) dOverlay.remove();
+    });
+
+    var dialog = el("div", "bp-dialog");
+    var title = el("h3", "bp-dialog-title");
+    var ic = el("span", "material-symbols-outlined", "error");
+    ic.style.fontSize = "18px";
+    title.appendChild(ic);
+    title.appendChild(el("span", null, "Halt all agents?"));
+
+    var desc = el("p", "bp-dialog-desc", "Every agent stops controlling the browser until you press Resume in the side panel.");
+
+    var actions = el("div", "bp-dialog-actions");
+    var cancelBtn = el("button", "bp-dialog-btn bp-dialog-btn-cancel", "Cancel");
+    cancelBtn.type = "button";
+    cancelBtn.addEventListener("click", function() { dOverlay.remove(); });
+
+    var stopBtn = el("button", "bp-dialog-btn bp-dialog-btn-stop", "Halt all");
+    stopBtn.type = "button";
+    stopBtn.addEventListener("click", function() {
+      dOverlay.remove();
+      log("POST /halt-all");
+      Api.request("POST", "/halt-all").then(function(r) {
+        setNotice(r.ok ? "All agents halted" : "Halt all failed: " + Api.errorText(r));
+        fetchState();
+      });
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(stopBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(desc);
+    dialog.appendChild(actions);
+    dOverlay.appendChild(dialog);
+    document.body.appendChild(dOverlay);
+  });
+
+  // ─── Debug logs ────────────────────────────────────────────────────────
+
   function fetchLogs() {
-    fetch(SERVER_URL + "/logs")
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        renderLogs(data.logs || []);
-      })
-      .catch(function(err) {
-        debugPanel.innerHTML = '<div style="color:#ef4444;">Error: ' + err.message + '</div>';
-      });
+    Api.request("GET", "/logs").then(function(r) {
+      clear(debugPanel);
+      if (!r.ok) {
+        debugPanel.appendChild(el("div", "bp-log-error", "Error: " + Api.errorText(r)));
+        return;
+      }
+      var logs = r.data && Array.isArray(r.data.logs) ? r.data.logs : [];
+      if (logs.length === 0) debugPanel.appendChild(el("div", "bp-log-line", "No log entries."));
+      for (var i = logs.length - 1; i >= 0; i--) {
+        var entry = logs[i];
+        if (!entry || typeof entry !== "object") continue;
+        var line = el("div", "bp-log-line");
+        var d = new Date(entry.timestamp);
+        line.appendChild(el("span", "bp-log-time", isNaN(d.getTime()) ? "" : d.toLocaleTimeString()));
+        line.appendChild(document.createTextNode(" " + (typeof entry.message === "string" ? entry.message : "")));
+        debugPanel.appendChild(line);
+      }
+    });
   }
 
-  // Fetch full debug info
-  function fetchDebug() {
-    fetch(SERVER_URL + "/debug")
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        var html = '';
-        html += '<div class="log-entry"><span class="log-msg" style="color:#58a6ff;">=== SERVER STATE ===</span></div>';
-        html += '<div class="log-entry"><span class="log-msg">SSE clients: ' + data.sseClients + '</span></div>';
-        html += '<div class="log-entry"><span class="log-msg">Session: ' + JSON.stringify(data.session) + '</span></div>';
-        html += '<div class="log-entry"><span class="log-msg">Sidebar: active=' + data.sidebar.active + ' task=' + (data.sidebar.taskName || 'none') + '</span></div>';
-        html += '<div class="log-entry"><span class="log-msg" style="color:#58a6ff;">=== RECENT LOGS ===</span></div>';
-        html += renderLogsHtml(data.recentLogs || []);
-        debugPanel.innerHTML = html;
-      })
-      .catch(function(err) {
-        debugPanel.innerHTML = '<div style="color:#ef4444;">Error: ' + err.message + '</div>';
-      });
-  }
-
-  function renderLogs(logs) {
-    debugPanel.innerHTML = renderLogsHtml(logs);
-  }
-
-  function renderLogsHtml(logs) {
-    var html = '';
-    for (var i = logs.length - 1; i >= 0; i--) {
-      var log = logs[i];
-      var time = new Date(log.timestamp).toLocaleTimeString();
-      html += '<div class="log-entry"><span class="log-time">' + time + '</span> <span class="log-msg">' + escapeHtml(log.message) + '</span></div>';
-    }
-    return html;
-  }
-
-  function escapeHtml(str) {
-    var div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  // Toggle debug panel
   debugToggle.addEventListener("click", function() {
     debugVisible = !debugVisible;
     if (debugVisible) {
-      debugPanel.classList.add("visible");
+      debugSection.classList.remove("bp-hidden");
+      debugSection.classList.add("flex");
       debugToggle.textContent = "Hide Debug Logs";
-      fetchDebug();
-      // Poll logs every 2 seconds while visible
-      debugPollTimer = setInterval(fetchDebug, 2000);
+      fetchLogs();
+      debugPollTimer = setInterval(fetchLogs, REFRESH_MS);
     } else {
-      debugPanel.classList.remove("visible");
-      debugToggle.textContent = "Show Debug Logs";
+      debugSection.classList.add("bp-hidden");
+      debugSection.classList.remove("flex");
+      debugToggle.textContent = "Debug Logs";
       if (debugPollTimer) {
         clearInterval(debugPollTimer);
         debugPollTimer = null;
@@ -128,66 +225,8 @@
     }
   });
 
-  // Initial status fetch
-  fetchStatus();
+  // ─── Start ─────────────────────────────────────────────────────────────
 
-  // Open sidebar button
-  openSidebarBtn.addEventListener("click", function() {
-    chrome.runtime.sendMessage({ type: "OPEN_SIDEBAR" }, function(response) {
-      if (response && response.success) {
-        window.close();
-      }
-    });
-  });
-
-  // Take control button
-  var takeControlBtn = document.getElementById("take-control");
-  takeControlBtn.addEventListener("click", function() {
-    var dOverlay = document.createElement('div');
-    dOverlay.className = 'bp-dialog-overlay';
-    dOverlay.addEventListener('click', function(e) {
-      if(e.target === dOverlay) dOverlay.remove();
-    });
-
-    var dialog = document.createElement('div');
-    dialog.className = 'bp-dialog';
-    
-    var title = document.createElement('h3');
-    title.className = 'bp-dialog-title';
-    title.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Halt AI Session?';
-    
-    var desc = document.createElement('p');
-    desc.className = 'bp-dialog-desc';
-    desc.innerText = 'This will end the current task and return control to you.';
-    
-    var actions = document.createElement('div');
-    actions.className = 'bp-dialog-actions';
-    
-    var cancelBtn = document.createElement('button');
-    cancelBtn.className = 'bp-dialog-btn bp-dialog-btn-cancel';
-    cancelBtn.innerText = 'Cancel';
-    cancelBtn.addEventListener('click', function() { dOverlay.remove(); });
-    
-    var stopBtn = document.createElement('button');
-    stopBtn.className = 'bp-dialog-btn bp-dialog-btn-stop';
-    stopBtn.innerText = 'Halt Action';
-    stopBtn.addEventListener('click', function() { 
-      dOverlay.remove();
-      chrome.runtime.sendMessage({ type: "STOP_BROWSER" }, function(response) {
-        if (response && response.success) {
-          window.close();
-        }
-      });
-    });
-    
-    actions.appendChild(cancelBtn);
-    actions.appendChild(stopBtn);
-    
-    dialog.appendChild(title);
-    dialog.appendChild(desc);
-    dialog.appendChild(actions);
-    
-    dOverlay.appendChild(dialog);
-    document.body.appendChild(dOverlay);
-  });
+  fetchState();
+  setInterval(fetchState, REFRESH_MS);
 })();
