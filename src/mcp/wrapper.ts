@@ -497,6 +497,22 @@ async function tryClaim(page: OwnedPage): Promise<void> {
 
 const ALLOWED_URL = /^(https?:|about:blank$|data:)/i;
 
+function isLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === "localhost" || h === "::1" || h === "0.0.0.0") return true;
+  if (/^127\./.test(h)) return true;              // 127.0.0.1, 127.1, 127.0.1, …
+  const mapped = h.match(/^::ffff:([0-9.]+)$/);   // ::ffff:127.0.0.1
+  if (mapped) return /^127\./.test(mapped[1]);
+  if (/^\d{1,10}$/.test(h)) {                     // decimal IPv4, e.g. 2130706433 = 127.0.0.1
+    const n = Number(h);
+    if (n >= 0 && n <= 0xffffffff) {
+      if (((n >>> 24) & 0xff) === 127) return true;
+      if (n === 0) return true;                   // 0.0.0.0
+    }
+  }
+  return false;
+}
+
 function checkUrl(url: string): string | null {
   const u = url.trim();
   if (!ALLOWED_URL.test(u)) {
@@ -507,8 +523,7 @@ function checkUrl(url: string): string | null {
       const parsed = new URL(u);
       const host = parsed.hostname.toLowerCase();
       const port = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
-      const loopback = host === "localhost" || host === "[::1]" || host === "0.0.0.0" || /^127\./.test(host);
-      if (loopback && (port === config.chrome.port || port === config.server.port)) {
+      if (isLoopbackHost(host) && (port === config.chrome.port || port === config.server.port)) {
         return "ERROR: That address is web-mcp's own control port and is off-limits to agents.";
       }
     } catch {

@@ -1,0 +1,60 @@
+name: Bug report
+description: File a bug report for Web MCP
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for reporting! Please fill in as much as you can."
+  - type: input
+    id: version
+    attributes:
+      label: Web MCP version
+      description: "Run `web-mcp status` or check `npm list -g @amitnarw/web-mcp`"
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 10 / macOS 15 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: ai-client
+    attributes:
+      label: AI client
+      description: "OpenCode, Cursor, Claude Code, Codex, Windsurf, Zed, Cody, Cline, Antigravity, …"
+      placeholder: "Cursor"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: "Describe what you did and what went wrong."
+      placeholder: "I asked OpenCode to open google.com and the browser never launched. The overlay stayed forever."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "A Chromium window opens with the Web MCP overlay."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. `web-mcp setup cursor`\n2. Restart Cursor\n3. \"Go to example.com\""
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: "Paste anything from `~/.web-mcp/logs/server.log` or screenshots that show the problem. Remove any secrets first."
+    validations:
+      required: false

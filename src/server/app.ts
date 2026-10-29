@@ -789,8 +789,12 @@ export function createApp(opts: CreateAppOptions): { app: express.Express; close
 
     if (!silent && text) {
       const timestamp = iso(now);
-      const safeText = redactedText ?? text;
-      agent.actions.push({ text, type, timestamp });
+      // Never persist raw typed text: fall back to a length-only form when the
+      // caller did not supply an explicit redactedText. This keeps the
+      // "typed text is never persisted" contract even if a future caller
+      // omits redactedText.
+      const safeText = redactedText ?? `(${text.length} chars)`;
+      agent.actions.push({ text: safeText, type, timestamp });
       if (agent.actions.length > MAX_ACTIONS_KEPT) agent.actions.splice(0, agent.actions.length - MAX_ACTIONS_KEPT);
       agent.recording.push({ type, text: safeText, timestamp });
       if (agent.recording.length > MAX_RECORDED_ACTIONS) agent.recording.shift();

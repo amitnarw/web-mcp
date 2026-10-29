@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "web-mcp extension",
   "version": "0.2.0",
+  "minimum_chrome_version": "114",
   "description": "A dedicated in-browser automation copilot: AI agents drive Chromium, each in its own tabs, with real-time visual feedback.",
   "icons": {
     "128": "icon128.png"

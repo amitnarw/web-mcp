@@ -1,8 +1,35 @@
-/* geist-sans-latin-400-normal */
+/* geist-sans-latin-400-normal (Geist font files are not bundled; map to the
+   bundled Inter files so `font-family: Geist, sans-serif` actually resolves
+   instead of silently falling back to the system font.) */
+/* Geist Sans 400 */
 @font-face {
   font-family: 'Geist Sans';
   font-style: normal;
-  font-display: swap;
   font-weight: 400;
-  src: url(./files/geist-sans-latin-400-normal.woff2) format('woff2'), url(./files/geist-sans-latin-400-normal.woff) format('woff');
+  font-display: swap;
+  src: url('./files/inter-latin-400-normal.woff2') format('woff2'), url('./files/inter-latin-400-normal.woff') format('woff');
+}
+/* Geist Sans 500 */
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./files/inter-latin-500-normal.woff2') format('woff2'), url('./files/inter-latin-500-normal.woff') format('woff');
+}
+/* Geist Sans 600 */
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./files/inter-latin-600-normal.woff2') format('woff2'), url('./files/inter-latin-600-normal.woff') format('woff');
+}
+/* Geist Sans 700 */
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./files/inter-latin-700-normal.woff2') format('woff2'), url('./files/inter-latin-700-normal.woff') format('woff');
 }

@@ -79,7 +79,7 @@ These are known, documented, and not fixed in 0.2.0:
 3. **Unverified client config paths:** Cline, Sourcegraph Cody and Antigravity. Setup writes the paths documented in [Supported clients](supported-clients.md); they need checking against each client's current docs.
 4. **ChatGPT Desktop** is still listed in the setup menu but only prints "not supported". Recommendation: remove it from the menu.
 5. **Exact pins plus shrinkwrap** mean dependency security fixes need a web-mcp release. Recommendation: add Dependabot or Renovate and CI, which the project doesn't have yet.
-6. **License:** the package has no `license` field and the repository no LICENSE file.
+6. **License:** resolved — `package.json` now has `"license": "MIT"` and a `LICENSE` file is present (MIT, © 2026 Amit Narwal).
 
 ## For users of 0.1.x
 

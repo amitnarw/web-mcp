@@ -59,17 +59,6 @@ Combine several steps into one request.
 - "Log in to the admin panel, export last week's report, and tell me the totals."
 - "Find a pasta recipe on this site, read the ingredients, and write them down as a shopping list."
 
-## Several AIs at once
-
-Each chat works in its own tabs with its own color, so you can run tasks in parallel. See [Several AIs at once](multi-agent.md).
-
-- **Research while another chat fills a form.** In one Claude Code chat: "Call browser_start with agentName 'Research' and compare the pricing pages of these three tools." In a Cursor chat at the same time: "Call browser_start with agentName 'QA', open http://localhost:3000/signup, and fill in the form with test data." Each works in its own tab, and neither can see the other's.
-- **Compare two models.** Ask the same question in OpenCode with two different models. Watch both agents work side by side and compare their answers.
-- **Front end and back office.** One chat places a test order on your shop's storefront while another checks that it appears in the admin panel.
-- **Logged in vs. logged out.** One agent uses your normal (logged-in) session, and another opens an isolated tab (`isolated: true`) to see what a new visitor sees.
-
-If one of them goes off track, press **Halt** on its card in the side panel. The others keep going. Press **Resume** when you're ready.
-
 ## Tips
 
 - **Name your agents** when you run several: "Call browser_start with agentName 'Research'." The name appears on the overlay and in the side panel.

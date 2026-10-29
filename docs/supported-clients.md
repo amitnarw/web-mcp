@@ -191,3 +191,77 @@ web-mcp uninstall                # menu
 **`uninstall all`** asks for confirmation: `--yes` on the command line, or `y` at the menu's `(y/N)` prompt. It stops Web MCP (server, helpers, browser), removes the entry from every client, and deletes Web MCP's own files in `~/.web-mcp`, **including the Web MCP browser profile and its logins**. Files it didn't create are left alone. See [Configuration](configuration.md#files-web-mcp-stores).
 
 To remove the CLI itself: `npm uninstall -g @amitnarw/web-mcp`.
+
+## Naming your agents
+
+Every chat a client starts gets its own agent with a default name like `Claude Code #1` or `Cursor #1`. To give those agents a consistent name, add `WEB_MCP_AGENT_NAME` to the client's MCP entry. The value is up to 60 characters. An `agentName` passed to `browser_start` overrides it.
+
+### JSON clients (Cursor, Claude Desktop, Windsurf, Cody, Antigravity, Cline)
+
+```json
+{
+  "mcpServers": {
+    "web-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@amitnarw/web-mcp@0.2.0", "mcp"],
+      "env": { "WEB_MCP_AGENT_NAME": "Cursor – frontend" }
+    }
+  }
+}
+```
+
+### OpenCode
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "web-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@amitnarw/web-mcp@0.2.0", "mcp"],
+      "enabled": true,
+      "environment": { "WEB_MCP_AGENT_NAME": "OpenCode – tests" }
+    }
+  }
+}
+```
+
+### Claude Code (CLI)
+
+With `claude` on your PATH:
+
+```bash
+claude mcp add --scope user web-mcp -e WEB_MCP_AGENT_NAME=Claude -- npx -y @amitnarw/web-mcp@0.2.0 mcp
+```
+
+Without `claude`, in `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "web-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@amitnarw/web-mcp@0.2.0", "mcp"],
+      "env": { "WEB_MCP_AGENT_NAME": "Claude Code" }
+    }
+  }
+}
+```
+
+### OpenAI Codex
+
+```toml
+[mcp_servers.web-mcp]
+command = "npx"
+args = ["-y", "@amitnarw/web-mcp@0.2.0", "mcp"]
+
+[mcp_servers.web-mcp.env]
+WEB_MCP_AGENT_NAME = "Codex"
+```
+
+### Zed
+
+Zed's `context_servers` entries don't support environment variables, so name each agent with `browser_start` after it connects instead.
+

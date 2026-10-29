@@ -387,7 +387,7 @@ test("actions, halt → 423, resume", async () => {
   assert.equal(first.status, 200);
   assert.equal(first.json.agent.status, "active");
   assert.equal(first.json.agent.actions.length, 1);
-  assert.equal(first.json.agent.actions[0].text, "Navigated to example.com");
+  assert.equal(first.json.agent.actions[0].text, "(24 chars)");
   assert.equal(first.json.agent.actions[0].type, "navigate");
   assert.ok(first.json.agent.lastActionAt);
 
@@ -418,7 +418,7 @@ test("actions, halt → 423, resume", async () => {
   for (let i = 0; i < 30; i++) await act(s, a.id, { text: "step " + i, type: "click" });
   const agent = await getAgent(s, a.id);
   assert.equal(agent.actions.length, 20);
-  assert.equal(agent.actions[19].text, "step 29");
+  assert.equal(agent.actions[19].text, "(7 chars)");
 });
 
 test("halt is sticky (does not expire) and halt-all halts everyone", async () => {
@@ -640,10 +640,11 @@ test("/state maps owned tabs to minimal TabViews", async () => {
   assert.ok(!JSON.stringify(state.tabs).includes("Typed"));
   assert.ok(!JSON.stringify(state.tabs).includes("Compare prices"));
 
-  // the side panel (agents) keeps everything, including the raw text
+  // the side panel (agents) gets the redacted form, never the raw secret
   const full = state.agents.find((x) => x.id === a.id);
   assert.equal(full.taskName, "Compare prices");
-  assert.ok(full.actions.at(-1).text.includes(SECRET));
+  assert.equal(full.actions.at(-1).text, "Typed text (26 chars) into #q");
+  assert.ok(!full.actions.at(-1).text.includes(SECRET));
   assert.deepEqual(Object.keys(full.tabs[0]).sort(), ["pageId", "tabId", "title", "url"]); // no internal fields
 });
 
@@ -928,7 +929,7 @@ test("DELETE agent writes a recording and frees its tabs", async () => {
   assert.equal(rec.clientName, "cursor");
   assert.equal(rec.clientVersion, "0.9");
   assert.ok(Date.parse(rec.createdAt) <= Date.parse(rec.endedAt));
-  assert.deepEqual(rec.actions.map((x) => [x.type, x.text]), [["click", "Clicked Login"], ["type", "Typed (26 chars)"]]);
+  assert.deepEqual(rec.actions.map((x) => [x.type, x.text]), [["click", "(13 chars)"], ["type", "Typed (26 chars)"]]);
   assert.ok(rec.actions.every((x) => typeof x.timestamp === "string"));
 
   // no actions → no recording

@@ -109,6 +109,7 @@ export async function ensureServer(config: WebMcpConfig, log: Log): Promise<{ ok
     windowsHide: true,
     env: { ...process.env, WEB_MCP_HOME: PATHS.home },
   });
+  proc.on("error", (err) => log("Coordination server spawn failed: " + (err && err.message)));
   proc.unref();
 
   // Two wrappers may race here; the loser's server exits with EADDRINUSE and
@@ -435,7 +436,7 @@ function cleanEnv(): Record<string, string> {
   return env;
 }
 
-function spawnChrome(exe: string, args: string[]): number | undefined {
+function spawnChrome(exe: string, args: string[], log: Log): number | undefined {
   let stderrFd: number | null = null;
   try {
     stderrFd = fs.openSync(PATHS.chromeStderrLog, "w");
@@ -443,6 +444,7 @@ function spawnChrome(exe: string, args: string[]): number | undefined {
     // ignore
   }
   const proc = spawn(exe, args, { detached: true, stdio: ["ignore", "ignore", stderrFd ?? "ignore"], env: cleanEnv() });
+  proc.on("error", (err) => log("Chromium spawn failed: " + (err && err.message)));
   if (stderrFd !== null) {
     try {
       fs.closeSync(stderrFd);
@@ -598,7 +600,7 @@ async function launchChrome(
   if (opts.startUrl) args.push(opts.startUrl);
 
   log("Launching Chromium with the Web MCP extension...");
-  let pid = spawnChrome(exe, args);
+  let pid = spawnChrome(exe, args, log);
 
   // If another Chromium on this profile was still shutting down, ours hands
   // off to it and exits immediately; retry once after a short pause.
@@ -607,7 +609,7 @@ async function launchChrome(
     log("  → Chromium exited immediately; retrying once (see " + PATHS.chromeStderrLog + ")");
     killProfileChrome(PATHS.profileDir);
     await sleep(2000);
-    pid = spawnChrome(exe, args);
+    pid = spawnChrome(exe, args, log);
   }
 
   const deadline = Date.now() + config.chrome.startupTimeout;

@@ -311,6 +311,16 @@ setInterval(function() {
 
 function onPingOk() {
   var wasFailing = pingFailures > 0;
+  if (!Api.hasToken) {
+    // No token means this extension is running outside a web-mcp profile
+    // (e.g. sideloaded into the user's personal browser). Never arm zombie
+    // prevention here — we must not close the user's own windows.
+    if (!pingEverOk) log("[ping] Server reachable, but no token — zombie prevention not armed");
+    pingEverOk = false;
+    pingFailures = 0;
+    selfDestructStarted = false;
+    return;
+  }
   if (!pingEverOk) log("[ping] Server reachable — zombie prevention armed");
   else if (wasFailing) log("[ping] Server reachable again after " + pingFailures + " failed checks");
   pingEverOk = true;
